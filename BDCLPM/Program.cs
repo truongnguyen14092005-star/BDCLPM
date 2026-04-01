@@ -12,6 +12,7 @@ class Program
             Console.WriteLine("1. Login Test");
             Console.WriteLine("2. Admin Test (Xóa comment)");
             Console.WriteLine("3. Search Movie Test");
+            Console.WriteLine("4. User Management Test (Xóa user)");
             Console.WriteLine("0. Thoát");
             Console.Write("👉 Chọn chức năng: ");
 
@@ -30,13 +31,18 @@ class Program
                         break;
 
                     case "2":
-                        LoginTest.Run(driver); // cần login trước
+                        LoginTest.Run(driver); // login trước
                         AdminTest.Run(driver);
                         break;
 
                     case "3":
-                        LoginTest.Run(driver); // cần login trước
+                        LoginTest.Run(driver); // login trước
                         SearchMovieTest.Run(driver);
+                        break;
+
+                    case "4":
+                        LoginTest.Run(driver); // login trước
+                        ManageUserTest.Run(driver);
                         break;
 
                     default:

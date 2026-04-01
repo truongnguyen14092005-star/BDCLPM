@@ -10,7 +10,7 @@ public class LoginTest
 
         Thread.Sleep(2000);
 
-        var emailInput = driver.FindElement(By.CssSelector("input[type='email'], input[name='Email']"));
+        var emailInput = driver.FindElement(By.CssSelector("input[type='email']"));
         var passwordInput = driver.FindElement(By.CssSelector("input[type='password']"));
 
         emailInput.Clear();
@@ -27,7 +27,7 @@ public class LoginTest
 
         if (!driver.Url.Contains("Login"))
         {
-            Console.WriteLine("✅ LOGIN THÀNH CÔNG");
+            Console.WriteLine("✔️ LOGIN THÀNH CÔNG");
         }
         else
         {

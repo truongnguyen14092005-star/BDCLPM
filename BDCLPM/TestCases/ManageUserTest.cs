@@ -1,38 +1,44 @@
 ﻿using OpenQA.Selenium;
 using OpenQA.Selenium.Support.UI;
 
-public class AdminTest
+public class ManageUserTest
 {
     public static void Run(IWebDriver driver)
     {
-        Console.WriteLine("👨‍💼 Admin Test bắt đầu...");
+        Console.WriteLine("👤 User Management Test bắt đầu...");
 
         WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
 
         try
         {
-            // 👉 Vào Dashboard
+            // ===== 1. VÀO DASHBOARD =====
             driver.Navigate().GoToUrl("https://localhost:5001/Admin");
             wait.Until(d => d.PageSource.Contains("Dashboard"));
 
             Console.WriteLine("📊 Đã vào Dashboard");
 
-            // 👉 Vào quản lý bình luận
-            driver.Navigate().GoToUrl("https://localhost:5001/Admin/ManageComments");
+            // ===== 2. VÀO QUẢN LÝ USER =====
+            driver.Navigate().GoToUrl("https://localhost:5001/Admin/ManageUsers");
             Thread.Sleep(2000);
 
-            Console.WriteLine("💬 Đã vào trang quản lý bình luận");
+            Console.WriteLine("👤 Đã vào Quản lý người dùng");
 
-            // 👉 Click nút xóa
+            // ===== 3. CLICK NÚT XÓA =====
             var deleteBtn = wait.Until(d =>
-                d.FindElement(By.CssSelector(".deleteCommentBtn"))
+                d.FindElement(By.CssSelector("button[title='Xóa người dùng']"))
             );
+
+            // 👉 Scroll tới button (tránh lỗi không click được)
+            ((IJavaScriptExecutor)driver)
+                .ExecuteScript("arguments[0].scrollIntoView(true);", deleteBtn);
+
+            Thread.Sleep(500);
 
             deleteBtn.Click();
 
-            Console.WriteLine("🗑️ Đã click nút xóa");
+            Console.WriteLine("🗑️ Đã click nút xóa user");
 
-            // ===== XỬ LÝ ALERT =====
+            // ===== 4. XỬ LÝ ALERT =====
             try
             {
                 IAlert alert = wait.Until(d => d.SwitchTo().Alert());
@@ -50,7 +56,7 @@ public class AdminTest
 
             Thread.Sleep(2000);
 
-            Console.WriteLine("✔️ XÓA HOÀN TẤT (nếu hệ thống OK)");
+            Console.WriteLine("✔️ XÓA USER HOÀN TẤT (nếu hệ thống OK)");
         }
         catch (Exception ex)
         {
