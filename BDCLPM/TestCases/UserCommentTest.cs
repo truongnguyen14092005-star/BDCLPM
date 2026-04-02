@@ -123,7 +123,7 @@ public class UserCommentTest
                     // Cách 2: ID mà user cung cấp trước đó
                     try
                     {
-                        commentInput = driver.FindElement(By.CssSelector("textarea[placeholder*='Vit bnh lu'], textarea[placeholder*='bnh lu'], #comment-content"));
+                        commentInput = driver.FindElement(By.CssSelector("textarea[placeholder*='Viết bình luận'], textarea[placeholder*='bình luận'], #comment-content"));
                         Console.WriteLine($"  ✅ Found comment input by ID: comment-content");
                     }
                     catch
@@ -605,7 +605,7 @@ public class UserCommentTest
             // Step 1: Gửi bình luận rỗng
             try
             {
-                var commentTextarea = driver.FindElement(By.CssSelector("textarea[placeholder*='Vit bnh lu'], textarea[placeholder*='bnh lu'], #comment-content")); // Fixed selector
+                var commentTextarea = driver.FindElement(By.CssSelector("textarea[placeholder*='Viết bình luận'], textarea[placeholder*='bình luận'], #comment-content")); // Fixed selector
                 commentTextarea.Clear(); // Để trống
 
                 var submitBtn = driver.FindElement(By.XPath("//button[contains(text(),'Gửi') or contains(text(),'Submit')]"));
@@ -630,7 +630,7 @@ public class UserCommentTest
             // Step 2: Gửi bình luận > 1000 ký tự
             try
             {
-                var commentTextarea = driver.FindElement(By.CssSelector("textarea[placeholder*='Vit bnh lu'], textarea[placeholder*='bnh lu'], #comment-content")); // Fixed selector
+                var commentTextarea = driver.FindElement(By.CssSelector("textarea[placeholder*='Viết bình luận'], textarea[placeholder*='bình luận'], #comment-content")); // Fixed selector
                 commentTextarea.Clear();
 
                 string longContent = new string('A', 1001); // 1001 ký tự
@@ -657,7 +657,7 @@ public class UserCommentTest
             // Step 3: Gửi bình luận đúng 1000 ký tự
             try
             {
-                var commentTextarea = driver.FindElement(By.CssSelector("textarea[placeholder*='Vit bnh lu'], textarea[placeholder*='bnh lu'], #comment-content")); // Fixed selector
+                var commentTextarea = driver.FindElement(By.CssSelector("textarea[placeholder*='Viết bình luận'], textarea[placeholder*='bình luận'], #comment-content")); // Fixed selector
                 commentTextarea.Clear();
 
                 string exactContent = new string('B', 1000); // Đúng 1000 ký tự
@@ -713,7 +713,7 @@ public class UserCommentTest
 
             try
             {
-                var commentTextarea = driver.FindElement(By.CssSelector("textarea[placeholder*='Vit bnh lu'], textarea[placeholder*='bnh lu'], #comment-content")); // Fixed selector
+                var commentTextarea = driver.FindElement(By.CssSelector("textarea[placeholder*='Viết bình luận'], textarea[placeholder*='bình luận'], #comment-content")); // Fixed selector
                 commentTextarea.Clear();
                 commentTextarea.SendKeys(testComment);
 

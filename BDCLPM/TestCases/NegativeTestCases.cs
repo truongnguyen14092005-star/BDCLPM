@@ -457,7 +457,7 @@ public class NegativeTestCases
             // Gửi comment rỗng
             try
             {
-                var commentTextarea = driver.FindElement(By.CssSelector("textarea[placeholder*='Vit bnh lu'], textarea[placeholder*='bnh lu'], #comment-content")); // Fixed selector
+                var commentTextarea = driver.FindElement(By.CssSelector("textarea[placeholder*='Viết bình luận'], textarea[placeholder*='bình luận'], #comment-content")); // Fixed selector
                 commentTextarea.Clear();
 
                 var submitBtn = driver.FindElement(By.XPath("//button[contains(text(),'Gửi') or contains(text(),'Submit')]"));
@@ -507,7 +507,7 @@ public class NegativeTestCases
 
             try
             {
-                var commentTextarea = driver.FindElement(By.CssSelector("textarea[placeholder*='Vit bnh lu'], textarea[placeholder*='bnh lu'], #comment-content")); // Fixed selector
+                var commentTextarea = driver.FindElement(By.CssSelector("textarea[placeholder*='Viết bình luận'], textarea[placeholder*='bình luận'], #comment-content")); // Fixed selector
                 commentTextarea.Clear();
 
                 string longContent = new string('A', 1500); // 1500 ký tự
