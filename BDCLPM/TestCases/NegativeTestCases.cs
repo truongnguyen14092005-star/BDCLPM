@@ -408,18 +408,8 @@ public class NegativeTestCases
             }
             catch { }
 
-            driver.Navigate().GoToUrl(BaseUrl);
-            Thread.Sleep(2000);
-
-            var searchInput = driver.FindElement(By.CssSelector("input[placeholder*='Search'], input[name='keyword']"));
-            searchInput.Clear();
-            searchInput.SendKeys("phim");
-            searchInput.SendKeys(Keys.Enter);
-            Thread.Sleep(2000);
-
-            var movieLink = driver.FindElement(By.CssSelector("a[href*='/Movie/Detail']"));
-            movieLink.Click();
-            Thread.Sleep(2500);
+            // Vào trang Watch để test comment
+            NavigateToWatchPage(driver);
 
             IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
             js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight)");
@@ -456,19 +446,8 @@ public class NegativeTestCases
             // Login trước
             EnsureLoggedIn(driver);
 
-            // Vào trang phim
-            driver.Navigate().GoToUrl(BaseUrl);
-            Thread.Sleep(2000);
-
-            var searchInput = driver.FindElement(By.CssSelector("input[placeholder*='Search'], input[name='keyword']"));
-            searchInput.Clear();
-            searchInput.SendKeys("phim");
-            searchInput.SendKeys(Keys.Enter);
-            Thread.Sleep(2000);
-
-            var movieLink = driver.FindElement(By.CssSelector("a[href*='/Movie/Detail']"));
-            movieLink.Click();
-            Thread.Sleep(2500);
+            // Vào trang Watch để test comment
+            NavigateToWatchPage(driver);
 
             // Cuộn xuống comment
             IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
@@ -478,7 +457,7 @@ public class NegativeTestCases
             // Gửi comment rỗng
             try
             {
-                var commentTextarea = driver.FindElement(By.CssSelector("textarea, input[name='content']"));
+                var commentTextarea = driver.FindElement(By.CssSelector("textarea[placeholder*='Vit bnh lu'], textarea[placeholder*='bnh lu'], #comment-content")); // Fixed selector
                 commentTextarea.Clear();
 
                 var submitBtn = driver.FindElement(By.XPath("//button[contains(text(),'Gửi') or contains(text(),'Submit')]"));
@@ -519,18 +498,8 @@ public class NegativeTestCases
         {
             EnsureLoggedIn(driver);
 
-            driver.Navigate().GoToUrl(BaseUrl);
-            Thread.Sleep(2000);
-
-            var searchInput = driver.FindElement(By.CssSelector("input[placeholder*='Search'], input[name='keyword']"));
-            searchInput.Clear();
-            searchInput.SendKeys("phim");
-            searchInput.SendKeys(Keys.Enter);
-            Thread.Sleep(2000);
-
-            var movieLink = driver.FindElement(By.CssSelector("a[href*='/Movie/Detail']"));
-            movieLink.Click();
-            Thread.Sleep(2500);
+            // Vào trang Watch để test comment
+            NavigateToWatchPage(driver);
 
             IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
             js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight)");
@@ -538,7 +507,7 @@ public class NegativeTestCases
 
             try
             {
-                var commentTextarea = driver.FindElement(By.CssSelector("textarea, input[name='content']"));
+                var commentTextarea = driver.FindElement(By.CssSelector("textarea[placeholder*='Vit bnh lu'], textarea[placeholder*='bnh lu'], #comment-content")); // Fixed selector
                 commentTextarea.Clear();
 
                 string longContent = new string('A', 1500); // 1500 ký tự
@@ -582,18 +551,8 @@ public class NegativeTestCases
         {
             EnsureLoggedIn(driver);
 
-            driver.Navigate().GoToUrl(BaseUrl);
-            Thread.Sleep(2000);
-
-            var searchInput = driver.FindElement(By.CssSelector("input[placeholder*='Search'], input[name='keyword']"));
-            searchInput.Clear();
-            searchInput.SendKeys("phim");
-            searchInput.SendKeys(Keys.Enter);
-            Thread.Sleep(2000);
-
-            var movieLink = driver.FindElement(By.CssSelector("a[href*='/Movie/Detail']"));
-            movieLink.Click();
-            Thread.Sleep(2500);
+            // Vào trang Watch để test comment
+            NavigateToWatchPage(driver);
 
             IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
             js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight)");
@@ -879,20 +838,101 @@ public class NegativeTestCases
 
     private static void EnsureLoggedIn(IWebDriver driver)
     {
-        driver.Navigate().GoToUrl($"{BaseUrl}/Account/Login");
-        Thread.Sleep(1500);
+        // Kiểm tra đã login chưa trước
+        if (!driver.Url.Contains("localhost:5001"))
+        {
+            driver.Navigate().GoToUrl(BaseUrl);
+            Thread.Sleep(1500);
+        }
+        
+        var loginLinks = driver.FindElements(By.XPath("//a[contains(text(),'Đăng nhập') or contains(text(),'Login')]"));
+        if (loginLinks.Count > 0)
+        {
+            // Chưa login, tiến hành login
+            driver.Navigate().GoToUrl($"{BaseUrl}/Account/Login");
+            Thread.Sleep(1500);
 
-        if (!driver.Url.Contains("Login")) return;
+            var emailInput = driver.FindElement(By.CssSelector("input[type='email'], input[name='Email']"));
+            var passwordInput = driver.FindElement(By.CssSelector("input[type='password']"));
 
-        var emailInput = driver.FindElement(By.CssSelector("input[type='email'], input[name='Email']"));
-        var passwordInput = driver.FindElement(By.CssSelector("input[type='password']"));
+            emailInput.Clear();
+            emailInput.SendKeys("user@test.com");
+            passwordInput.Clear();
+            passwordInput.SendKeys("User@1234");
 
-        emailInput.Clear();
-        emailInput.SendKeys("user@test.com");
-        passwordInput.Clear();
-        passwordInput.SendKeys("User@1234");
+            driver.FindElement(By.CssSelector("button[type='submit']")).Click();
+            Thread.Sleep(3000);
+        }
+    }
 
-        driver.FindElement(By.CssSelector("button[type='submit']")).Click();
-        Thread.Sleep(3000);
+    /// <summary>
+    /// Helper: Navigate to Watch page để test comment - FIXED cho web thực tế
+    /// </summary>
+    public static void NavigateToWatchPage(IWebDriver driver)
+    {
+        try
+        {
+            // ✅ FIX: Không navigate về trang chủ để tránh mất login session
+            if (!driver.Url.Contains("localhost:5001") || driver.Url.Contains("Login"))
+            {
+                driver.Navigate().GoToUrl(BaseUrl);
+                Thread.Sleep(2000);
+            }
+
+            // Search with better keyword
+            var searchInput = driver.FindElement(By.CssSelector("input[placeholder*='Search'], input[placeholder*='search'], input[placeholder*='Tìm'], input[name='keyword'], .search-input"));
+            searchInput.Clear();
+            searchInput.SendKeys("mai"); // Better keyword
+            searchInput.SendKeys(Keys.Enter);
+            Thread.Sleep(3000);
+
+            // Click on first movie (flexible selectors)
+            var movieLinks = driver.FindElements(By.CssSelector("a[href*='/Movie/Detail'], .movie-card a, .movie-item a"));
+            if (movieLinks.Count == 0)
+            {
+                throw new Exception("No movies found in search");
+            }
+            movieLinks[0].Click();
+            Thread.Sleep(3000);
+
+            // Try multiple ways to get to Watch page
+            bool success = false;
+            
+            // Method 1: Find Watch/Xem button
+            try
+            {
+                var watchBtn = driver.FindElement(By.XPath("//a[contains(text(),'Xem') or contains(text(),'Watch') or contains(@href,'Watch')] | //button[contains(text(),'Xem') or contains(text(),'Watch')]"));
+                watchBtn.Click();
+                Thread.Sleep(3000);
+                success = true;
+            }
+            catch
+            {
+                // Method 2: Try direct URL construction
+                try
+                {
+                    string currentUrl = driver.Url;
+                    if (currentUrl.Contains("slug="))
+                    {
+                        string slug = currentUrl.Split("slug=")[1].Split("&")[0];
+                        string watchUrl = $"{BaseUrl}/Watch?slug={slug}";
+                        driver.Navigate().GoToUrl(watchUrl);
+                        Thread.Sleep(3000);
+                        success = true;
+                    }
+                }
+                catch { }
+            }
+
+            if (!success)
+            {
+                Console.WriteLine($"⚠️ Could not navigate to Watch page from: {driver.Url}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ NavigateToWatchPage error: {ex.Message}");
+            throw;
+        }
     }
 }
