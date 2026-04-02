@@ -8,7 +8,14 @@ public class ReportManager
 
     public static void Init()
     {
-        var spark = new ExtentSparkReporter("Reports/report.html");
+        // Ensure Reports directory exists
+        var reportsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Reports");
+        if (!Directory.Exists(reportsDir))
+        {
+            Directory.CreateDirectory(reportsDir);
+        }
+
+        var spark = new ExtentSparkReporter(Path.Combine(reportsDir, "report.html"));
 
         extent = new ExtentReports();
         extent.AttachReporter(spark);
