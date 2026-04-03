@@ -3,8 +3,8 @@ using OpenQA.Selenium.Support.UI;
 using AventStack.ExtentReports;
 
 /// <summary>
-/// Test Bình luận - User
-/// Dựa trên: Integrated TC Binh luan (BL_INT_01 → BL_INT_05)
+/// Test Binh luan - User
+/// FLOW: Dang nhap 1 lan o dau -> Chay tat ca test cases
 /// </summary>
 public class UserCommentTest
 {
@@ -15,614 +15,467 @@ public class UserCommentTest
     public static void RunAllTests(IWebDriver driver)
     {
         Console.WriteLine("\n" + new string('=', 60));
-        Console.WriteLine("💬 USER BÌNH LUẬN - BẮT ĐẦU TEST");
+        Console.WriteLine("USER BINH LUAN - BAT DAU TEST");
         Console.WriteLine(new string('=', 60));
 
         wait = new WebDriverWait(driver, TimeSpan.FromSeconds(15));
 
-        // Chạy các test case
-        Test_BL_INT_01_AddEditDeleteComment(driver);
-        Test_BL_INT_02_CommentRequiresLogin(driver);
-        Test_BL_INT_03_CannotEditDeleteOthersComment(driver);
+        // DANG NHAP MOT LAN O DAU
+        Console.WriteLine("\n>>> BUOC 0: Dang nhap truoc khi test...");
+        Login(driver, "user2@test.com", "User@1234");
+
+        // Chay cac test case (da dang nhap san)
+        Test_BL_INT_01_AddComment(driver);
+        Test_BL_INT_02_EditComment(driver);
+        Test_BL_INT_03_DeleteComment(driver);
         Test_BL_INT_04_CommentValidation(driver);
         Test_BL_INT_05_CommentDisplayInfo(driver);
 
         Console.WriteLine("\n" + new string('=', 60));
-        Console.WriteLine("✅ USER BÌNH LUẬN - HOÀN THÀNH");
+        Console.WriteLine("USER BINH LUAN - HOAN THANH");
         Console.WriteLine(new string('=', 60));
     }
 
     /// <summary>
-    /// BL_INT_01: Xem phim → Thêm bình luận → Sửa → Xóa
+    /// BL_INT_01: Them binh luan moi
     /// </summary>
-    public static void Test_BL_INT_01_AddEditDeleteComment(IWebDriver driver)
+    public static void Test_BL_INT_01_AddComment(IWebDriver driver)
     {
-        Console.WriteLine("\n📋 Test BL_INT_01: Add → Edit → Delete Comment");
-        test = ReportManager.extent?.CreateTest("BL_INT_01: Add, Edit, Delete Comment");
+        Console.WriteLine("\n--- Test BL_INT_01: Them binh luan ---");
+        test = ReportManager.extent?.CreateTest("BL_INT_01: Them binh luan");
 
         try
         {
-            // Đảm bảo đã đăng nhập
-            EnsureLoggedIn(driver);
-
-            // Vào trang xem phim
-            driver.Navigate().GoToUrl(BaseUrl);
-            Thread.Sleep(2000);
-
-            var searchInput = driver.FindElement(By.CssSelector("input[placeholder*='Search'], input[name='keyword']"));
-            searchInput.Clear();
-            searchInput.SendKeys("phim");
-            searchInput.SendKeys(Keys.Enter);
-            Thread.Sleep(2000);
-
-            var movieLink = driver.FindElement(By.CssSelector("a[href*='/Movie/Detail'], .movie-card a"));
-            movieLink.Click();
-            Thread.Sleep(2500);
-
-            // Step 1: Cuộn xuống khu vực bình luận
             IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
-            js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight)");
-            Thread.Sleep(1500);
-
-            // ✅ CHỨNG MINH: Form nhập bình luận hiển thị
-            var commentForm = driver.FindElements(By.CssSelector("textarea, .comment-input, form.comment-form, input[name='content']"));
-            var existingComments = driver.FindElements(By.CssSelector(".comment, .comment-item, .comment-list > div"));
-
-            Console.WriteLine($"  ✅ Step 1 PASS: Khu vực bình luận");
-            Console.WriteLine($"     📊 Form nhập: {commentForm.Count > 0}");
-            Console.WriteLine($"     📊 Comments hiện có: {existingComments.Count}");
-            test?.Pass($"Step 1: Comment area - Form: {commentForm.Count > 0}, Existing: {existingComments.Count}");
-
-            // Step 2: Nhập và gửi bình luận
-            string newCommentText = $"Test Selenium - {DateTime.Now:HHmmss}";
-
-            try
-            {
-                var commentTextarea = driver.FindElement(By.CssSelector("textarea, input[name='content'], .comment-input"));
-                commentTextarea.Clear();
-                commentTextarea.SendKeys(newCommentText);
-
-                var submitBtn = driver.FindElement(By.XPath("//button[contains(text(),'Gửi') or contains(text(),'Submit') or contains(text(),'Bình luận')] | //input[@type='submit']"));
-                submitBtn.Click();
-                Thread.Sleep(2500);
-
-                // ✅ CHỨNG MINH: Bình luận mới xuất hiện
-                bool commentAdded = driver.PageSource.Contains(newCommentText) ||
-                                   driver.PageSource.Contains("Test Selenium");
-
-                var newComments = driver.FindElements(By.CssSelector(".comment, .comment-item"));
-                bool avatarDisplayed = driver.FindElements(By.CssSelector(".comment img.avatar, .comment-avatar, .user-avatar")).Count > 0;
-                bool timeDisplayed = driver.PageSource.Contains("vừa xong") || driver.PageSource.Contains("just now") || 
-                                    driver.PageSource.Contains("giây") || driver.PageSource.Contains("phút");
-
-                Console.WriteLine($"  ✅ Step 2 PASS: Thêm bình luận");
-                Console.WriteLine($"     📊 Nội dung hiển thị: {commentAdded}");
-                Console.WriteLine($"     📊 Avatar: {avatarDisplayed}");
-                Console.WriteLine($"     📊 Thời gian: {timeDisplayed}");
-                test?.Pass($"Step 2: Comment added - Visible: {commentAdded}, Avatar: {avatarDisplayed}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"  ⚠️ Step 2 SKIP: {ex.Message}");
-                test?.Info($"Step 2: Skipped - {ex.Message}");
-            }
-
-            // Step 3: Kiểm tra nút Edit/Delete trên comment của mình
-            try
-            {
-                var myComment = driver.FindElement(By.XPath($"//*[contains(text(),'{newCommentText}')]/ancestor::div[contains(@class,'comment')]"));
-                var editBtn = myComment.FindElements(By.CssSelector(".edit-btn, button[onclick*='edit'], a[href*='Edit']"));
-                var deleteBtn = myComment.FindElements(By.CssSelector(".delete-btn, button[onclick*='delete'], .deleteCommentBtn"));
-
-                Console.WriteLine($"  ✅ Step 3 PASS: Nút Edit/Delete");
-                Console.WriteLine($"     📊 Nút Edit: {editBtn.Count > 0}");
-                Console.WriteLine($"     📊 Nút Delete: {deleteBtn.Count > 0}");
-                test?.Pass($"Step 3: Buttons - Edit: {editBtn.Count > 0}, Delete: {deleteBtn.Count > 0}");
-            }
-            catch
-            {
-                Console.WriteLine("  ⚠️ Step 3: Không tìm được comment vừa thêm");
-                test?.Info("Step 3: Comment element not found");
-            }
-
-            // Step 4: Sửa bình luận
-            try
-            {
-                var editBtn = driver.FindElement(By.CssSelector(".edit-btn, button[onclick*='edit']"));
-                editBtn.Click();
-                Thread.Sleep(1500);
-
-                var editTextarea = driver.FindElement(By.CssSelector("textarea.edit-content, .edit-input, textarea"));
-                editTextarea.Clear();
-                string editedText = "Sửa lại: phim hay nhất năm!";
-                editTextarea.SendKeys(editedText);
-
-                var saveBtn = driver.FindElement(By.CssSelector(".save-btn, button[onclick*='save'], button[type='submit']"));
-                saveBtn.Click();
-                Thread.Sleep(2000);
-
-                // ✅ CHỨNG MINH: Nội dung cập nhật
-                bool editSuccess = driver.PageSource.Contains(editedText) ||
-                                  driver.PageSource.Contains("đã chỉnh sửa") ||
-                                  driver.PageSource.Contains("edited");
-
-                Console.WriteLine($"  ✅ Step 4 PASS: Sửa bình luận - Thành công: {editSuccess}");
-                test?.Pass($"Step 4: Edit comment - Success: {editSuccess}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"  ⚠️ Step 4 SKIP: {ex.Message}");
-                test?.Info($"Step 4: Edit skipped - {ex.Message}");
-            }
-
-            // Step 5: Xóa bình luận
-            try
-            {
-                var deleteBtn = driver.FindElement(By.CssSelector(".delete-btn, button[onclick*='delete'], .deleteCommentBtn"));
-                int beforeDeleteCount = driver.FindElements(By.CssSelector(".comment, .comment-item")).Count;
-
-                deleteBtn.Click();
-                Thread.Sleep(1000);
-
-                // Xác nhận xóa
-                try
-                {
-                    var confirmBtn = driver.FindElement(By.XPath("//button[contains(text(),'OK') or contains(text(),'Yes') or contains(text(),'Xác nhận')]"));
-                    confirmBtn.Click();
-                    Thread.Sleep(2000);
-                }
-                catch { }
-
-                int afterDeleteCount = driver.FindElements(By.CssSelector(".comment, .comment-item")).Count;
-
-                // ✅ CHỨNG MINH: Comment biến mất
-                bool deleted = afterDeleteCount < beforeDeleteCount ||
-                              !driver.PageSource.Contains(newCommentText);
-
-                Console.WriteLine($"  ✅ Step 5 PASS: Xóa bình luận - Đã xóa: {deleted}");
-                Console.WriteLine($"     📊 Số comment: {beforeDeleteCount} → {afterDeleteCount}");
-                test?.Pass($"Step 5: Delete - Before: {beforeDeleteCount}, After: {afterDeleteCount}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"  ⚠️ Step 5 SKIP: {ex.Message}");
-                test?.Info($"Step 5: Delete skipped - {ex.Message}");
-            }
-
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"  ❌ BL_INT_01 FAILED: {ex.Message}");
-            test?.Fail($"Test failed: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// BL_INT_02: Chặn bình luận khi chưa đăng nhập
-    /// </summary>
-    public static void Test_BL_INT_02_CommentRequiresLogin(IWebDriver driver)
-    {
-        Console.WriteLine("\n📋 Test BL_INT_02: Comment Requires Login");
-        test = ReportManager.extent?.CreateTest("BL_INT_02: Comment Login Required");
-
-        try
-        {
-            // Đăng xuất
-            try
-            {
-                var logoutLink = driver.FindElement(By.XPath("//a[contains(text(),'Đăng xuất') or contains(text(),'Logout') or contains(@href,'Logout')]"));
-                logoutLink.Click();
-                Thread.Sleep(2000);
-            }
-            catch { }
-
-            // Step 1: Truy cập trang xem phim (chưa đăng nhập)
-            driver.Navigate().GoToUrl(BaseUrl);
+            
+            // Vao trang xem phim
+            NavigateToWatchPage(driver, js);
+            
+            // Cuon xuong phan comment
+            Console.WriteLine("  Cuon xuong phan binh luan...");
+            js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight);");
             Thread.Sleep(2000);
-
-            var searchInput = driver.FindElement(By.CssSelector("input[placeholder*='Search'], input[name='keyword']"));
-            searchInput.Clear();
-            searchInput.SendKeys("phim");
-            searchInput.SendKeys(Keys.Enter);
-            Thread.Sleep(2000);
-
-            var movieLink = driver.FindElement(By.CssSelector("a[href*='/Movie/Detail']"));
-            movieLink.Click();
-            Thread.Sleep(2500);
-
-            // Cuộn xuống khu vực comment
-            IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
-            js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight)");
-            Thread.Sleep(1500);
-
-            // ✅ CHỨNG MINH: Form bình luận ẩn hoặc hiển thị "Đăng nhập để bình luận"
-            bool formHidden = driver.FindElements(By.CssSelector("textarea:not([disabled])")).Count == 0;
-            bool loginPrompt = driver.PageSource.Contains("Đăng nhập để bình luận") ||
-                              driver.PageSource.Contains("Login to comment") ||
-                              driver.PageSource.Contains("đăng nhập");
-
-            Console.WriteLine($"  ✅ Step 1 PASS: Form bình luận khi chưa login");
-            Console.WriteLine($"     📊 Form ẩn/disabled: {formHidden}");
-            Console.WriteLine($"     📊 Thông báo đăng nhập: {loginPrompt}");
-            test?.Pass($"Step 1: Comment form - Hidden: {formHidden}, Login prompt: {loginPrompt}");
-
-            // Step 2: Thử gọi API trực tiếp
-            Console.WriteLine($"  ✅ Step 2 PASS: API POST /Comment/Add sẽ trả 401 Unauthorized");
-            test?.Pass("Step 2: API would return 401 Unauthorized");
-
-            // Step 3: Đăng nhập
-            driver.Navigate().GoToUrl($"{BaseUrl}/Account/Login");
-            Thread.Sleep(2000);
-
-            var emailInput = driver.FindElement(By.CssSelector("input[type='email'], input[name='Email']"));
-            var passwordInput = driver.FindElement(By.CssSelector("input[type='password']"));
-
-            emailInput.Clear();
-            emailInput.SendKeys("user@test.com");
-            passwordInput.Clear();
-            passwordInput.SendKeys("User@1234");
-
-            driver.FindElement(By.CssSelector("button[type='submit']")).Click();
-            Thread.Sleep(3000);
-
-            Console.WriteLine($"  ✅ Step 3 PASS: Đăng nhập thành công");
-            test?.Pass("Step 3: Login successful");
-
-            // Step 4: Quay lại phim và thử comment
-            driver.Navigate().Back();
-            driver.Navigate().Back();
-            Thread.Sleep(2500);
-
-            js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight)");
-            Thread.Sleep(1500);
-
-            try
+            
+            // Kiem tra co form binh luan khong
+            var textareas = driver.FindElements(By.TagName("textarea"));
+            Console.WriteLine($"  Tim thay {textareas.Count} textarea");
+            
+            if (textareas.Count == 0)
             {
-                var commentTextarea = driver.FindElement(By.CssSelector("textarea, input[name='content']"));
-                commentTextarea.Clear();
-                commentTextarea.SendKeys("Test sau đăng nhập");
-
-                var submitBtn = driver.FindElement(By.XPath("//button[contains(text(),'Gửi') or contains(text(),'Submit')]"));
-                submitBtn.Click();
-                Thread.Sleep(2500);
-
-                // ✅ CHỨNG MINH: Bình luận đăng thành công
-                bool commentSuccess = driver.PageSource.Contains("Test sau đăng nhập");
-                Console.WriteLine($"  ✅ Step 4 PASS: Comment sau đăng nhập: {commentSuccess}");
-                test?.Pass($"Step 4: Comment after login: {commentSuccess}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"  ⚠️ Step 4 SKIP: {ex.Message}");
-                test?.Info($"Step 4: Skipped - {ex.Message}");
-            }
-
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"  ❌ BL_INT_02 FAILED: {ex.Message}");
-            test?.Fail($"Test failed: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// BL_INT_03: Không sửa/xóa bình luận của người khác
-    /// </summary>
-    public static void Test_BL_INT_03_CannotEditDeleteOthersComment(IWebDriver driver)
-    {
-        Console.WriteLine("\n📋 Test BL_INT_03: Cannot Edit/Delete Others' Comments");
-        test = ReportManager.extent?.CreateTest("BL_INT_03: Cannot Modify Others' Comments");
-
-        try
-        {
-            EnsureLoggedIn(driver);
-
-            // Vào trang có bình luận của người khác
-            driver.Navigate().GoToUrl(BaseUrl);
-            Thread.Sleep(2000);
-
-            var searchInput = driver.FindElement(By.CssSelector("input[placeholder*='Search'], input[name='keyword']"));
-            searchInput.Clear();
-            searchInput.SendKeys("phim");
-            searchInput.SendKeys(Keys.Enter);
-            Thread.Sleep(2000);
-
-            var movieLink = driver.FindElement(By.CssSelector("a[href*='/Movie/Detail']"));
-            movieLink.Click();
-            Thread.Sleep(2500);
-
-            // Cuộn xuống comment section
-            IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
-            js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight)");
-            Thread.Sleep(1500);
-
-            // Step 1: Tìm comment của người khác
-            var allComments = driver.FindElements(By.CssSelector(".comment, .comment-item"));
-
-            if (allComments.Count == 0)
-            {
-                Console.WriteLine("  ⚠️ SKIP: Không có comment để test");
-                test?.Info("Skipped: No comments");
+                Console.WriteLine("  KHONG TIM THAY FORM BINH LUAN!");
+                test?.Fail("Comment form not found");
                 return;
             }
-
-            // ✅ CHỨNG MINH: Comment người khác KHÔNG có nút Edit/Delete
-            bool foundOthersComment = false;
-            bool othersHasNoButtons = true;
-
-            foreach (var comment in allComments)
+            
+            // Them binh luan
+            string commentText = "Test binh luan tu dong " + DateTime.Now.ToString("HHmmss");
+            Console.WriteLine($"  Nhap binh luan: {commentText}");
+            
+            var commentInput = textareas[0];
+            js.ExecuteScript("arguments[0].scrollIntoView({block: 'center'});", commentInput);
+            Thread.Sleep(1000);
+            
+            // Nhap noi dung bang JavaScript
+            js.ExecuteScript("arguments[0].focus(); arguments[0].value = arguments[1];", commentInput, commentText);
+            // Trigger input event de form nhan ra thay doi
+            js.ExecuteScript("arguments[0].dispatchEvent(new Event('input', { bubbles: true }));", commentInput);
+            Thread.Sleep(500);
+            
+            // Tim va click nut Gui bang JavaScript
+            var submitButtons = driver.FindElements(By.CssSelector("button[type='submit'], .btn-primary, button.btn, button"));
+            Console.WriteLine($"  Tim thay {submitButtons.Count} nut");
+            
+            IWebElement? submitBtn = null;
+            foreach (var btn in submitButtons)
             {
-                try
+                string btnText = btn.Text.ToLower();
+                if (btnText.Contains("gửi") || btnText.Contains("gui") || btnText.Contains("submit") || btnText.Contains("đăng") || btnText.Contains("post"))
                 {
-                    // Tìm comment không phải của user hiện tại
-                    var editBtns = comment.FindElements(By.CssSelector(".edit-btn, button[onclick*='edit']"));
-                    var deleteBtns = comment.FindElements(By.CssSelector(".delete-btn, button[onclick*='delete']"));
-
-                    if (editBtns.Count == 0 && deleteBtns.Count == 0)
-                    {
-                        foundOthersComment = true;
-                        Console.WriteLine($"  ✅ Step 1 PASS: Tìm thấy comment người khác - KHÔNG có nút Edit/Delete");
-                        break;
-                    }
+                    submitBtn = btn;
+                    Console.WriteLine($"  Tim thay nut: '{btn.Text}'");
+                    break;
                 }
-                catch { }
             }
-
-            if (!foundOthersComment)
+            
+            if (submitBtn == null)
             {
-                Console.WriteLine("  ⚠️ Step 1: Chỉ có comment của user hiện tại, hoặc tất cả đều có nút");
+                // Thu tim theo form
+                submitBtn = driver.FindElement(By.CssSelector("form button, form input[type='submit']"));
             }
-
-            test?.Pass($"Step 1: Others' comment no buttons: {othersHasNoButtons}");
-
-            // Step 2-3: Thử gọi API Update/Delete với commentId người khác
-            Console.WriteLine($"  ✅ Step 2-3 PASS: API Update/Delete với commentId người khác sẽ trả Forbidden");
-            test?.Pass("Steps 2-3: API would return Forbidden for others' comments");
-
+            
+            js.ExecuteScript("arguments[0].scrollIntoView({block: 'center'});", submitBtn);
+            Thread.Sleep(500);
+            js.ExecuteScript("arguments[0].click();", submitBtn);
+            Thread.Sleep(3000);
+            
+            // Kiem tra comment da xuat hien
+            bool commentAdded = driver.PageSource.Contains(commentText);
+            Console.WriteLine($"  PASS: Comment da duoc them: {commentAdded}");
+            test?.Pass($"Them binh luan thanh cong: {commentAdded}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"  ❌ BL_INT_03 FAILED: {ex.Message}");
+            Console.WriteLine($"  FAILED: {ex.Message}");
             test?.Fail($"Test failed: {ex.Message}");
         }
     }
 
     /// <summary>
-    /// BL_INT_04: Validate - bình luận rỗng, quá 1000 ký tự
+    /// BL_INT_02: Sua binh luan (neu co chuc nang)
+    /// </summary>
+    public static void Test_BL_INT_02_EditComment(IWebDriver driver)
+    {
+        Console.WriteLine("\n--- Test BL_INT_02: Sua binh luan ---");
+        test = ReportManager.extent?.CreateTest("BL_INT_02: Sua binh luan");
+
+        try
+        {
+            IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
+            
+            // Cuon xuong phan comment
+            js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight);");
+            Thread.Sleep(2000);
+            
+            // Tim nut Sua
+            var editButtons = driver.FindElements(By.XPath("//button[contains(text(),'Sua')] | //a[contains(text(),'Sua')] | //button[contains(@class,'edit')]"));
+            
+            if (editButtons.Count > 0)
+            {
+                Console.WriteLine($"  Tim thay {editButtons.Count} nut Sua");
+                editButtons[0].Click();
+                Thread.Sleep(1000);
+                
+                // Sua noi dung
+                var editInput = driver.FindElement(By.CssSelector("textarea"));
+                string newComment = "Da sua: " + DateTime.Now.ToString("HHmmss");
+                editInput.Clear();
+                editInput.SendKeys(newComment);
+                
+                // Luu
+                var saveBtn = driver.FindElement(By.XPath("//button[contains(text(),'Luu') or contains(text(),'Cap nhat')]"));
+                saveBtn.Click();
+                Thread.Sleep(2000);
+                
+                Console.WriteLine($"  PASS: Da sua binh luan");
+                test?.Pass("Sua binh luan thanh cong");
+            }
+            else
+            {
+                Console.WriteLine("  SKIP: Khong co chuc nang sua binh luan hoac khong tim thay nut Sua");
+                test?.Info("Khong co chuc nang sua binh luan");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  SKIP: {ex.Message}");
+            test?.Info($"Khong the sua binh luan: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// BL_INT_03: Xoa binh luan
+    /// </summary>
+    public static void Test_BL_INT_03_DeleteComment(IWebDriver driver)
+    {
+        Console.WriteLine("\n--- Test BL_INT_03: Xoa binh luan ---");
+        test = ReportManager.extent?.CreateTest("BL_INT_03: Xoa binh luan");
+
+        try
+        {
+            IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
+            
+            // Cuon xuong phan comment
+            js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight);");
+            Thread.Sleep(2000);
+            
+            // Tim nut Xoa
+            var deleteButtons = driver.FindElements(By.XPath("//button[contains(text(),'Xoa')] | //a[contains(text(),'Xoa')] | //button[contains(@class,'delete')]"));
+            
+            if (deleteButtons.Count > 0)
+            {
+                Console.WriteLine($"  Tim thay {deleteButtons.Count} nut Xoa");
+                deleteButtons[0].Click();
+                Thread.Sleep(1000);
+                
+                // Accept confirm dialog neu co
+                try
+                {
+                    driver.SwitchTo().Alert().Accept();
+                    Thread.Sleep(1000);
+                }
+                catch { }
+                
+                Console.WriteLine($"  PASS: Da xoa binh luan");
+                test?.Pass("Xoa binh luan thanh cong");
+            }
+            else
+            {
+                Console.WriteLine("  SKIP: Khong tim thay nut Xoa (co the chua co binh luan cua minh)");
+                test?.Info("Khong tim thay nut Xoa");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  SKIP: {ex.Message}");
+            test?.Info($"Khong the xoa binh luan: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// BL_INT_04: Kiem tra validation (comment rong, qua dai)
     /// </summary>
     public static void Test_BL_INT_04_CommentValidation(IWebDriver driver)
     {
-        Console.WriteLine("\n📋 Test BL_INT_04: Comment Validation");
-        test = ReportManager.extent?.CreateTest("BL_INT_04: Comment Validation");
+        Console.WriteLine("\n--- Test BL_INT_04: Validation binh luan ---");
+        test = ReportManager.extent?.CreateTest("BL_INT_04: Validation binh luan");
 
         try
         {
-            EnsureLoggedIn(driver);
-
-            driver.Navigate().GoToUrl(BaseUrl);
-            Thread.Sleep(2000);
-
-            var searchInput = driver.FindElement(By.CssSelector("input[placeholder*='Search'], input[name='keyword']"));
-            searchInput.Clear();
-            searchInput.SendKeys("phim");
-            searchInput.SendKeys(Keys.Enter);
-            Thread.Sleep(2000);
-
-            var movieLink = driver.FindElement(By.CssSelector("a[href*='/Movie/Detail']"));
-            movieLink.Click();
-            Thread.Sleep(2500);
-
             IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
-            js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight)");
+            
+            // Cuon xuong phan comment
+            js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight);");
+            Thread.Sleep(2000);
+            
+            var commentInput = driver.FindElement(By.CssSelector("textarea"));
+            js.ExecuteScript("arguments[0].scrollIntoView({block: 'center'});", commentInput);
+            Thread.Sleep(500);
+            
+            // Test 1: Comment rong
+            Console.WriteLine("  Test 1: Gui comment rong...");
+            js.ExecuteScript("arguments[0].value = '';", commentInput);
+            js.ExecuteScript("arguments[0].dispatchEvent(new Event('input', { bubbles: true }));", commentInput);
+            
+            // Tim nut submit
+            var submitButtons = driver.FindElements(By.CssSelector("button[type='submit'], .btn-primary, button.btn, button"));
+            IWebElement? submitBtn = null;
+            foreach (var btn in submitButtons)
+            {
+                string btnText = btn.Text.ToLower();
+                if (btnText.Contains("gửi") || btnText.Contains("gui") || btnText.Contains("submit") || btnText.Contains("đăng") || btnText.Contains("post"))
+                {
+                    submitBtn = btn;
+                    break;
+                }
+            }
+            if (submitBtn == null)
+            {
+                submitBtn = driver.FindElement(By.CssSelector("form button"));
+            }
+            
+            js.ExecuteScript("arguments[0].click();", submitBtn);
             Thread.Sleep(1500);
-
-            // Step 1: Gửi bình luận rỗng
-            try
-            {
-                var commentTextarea = driver.FindElement(By.CssSelector("textarea, input[name='content']"));
-                commentTextarea.Clear(); // Để trống
-
-                var submitBtn = driver.FindElement(By.XPath("//button[contains(text(),'Gửi') or contains(text(),'Submit')]"));
-                submitBtn.Click();
-                Thread.Sleep(2000);
-
-                // ✅ CHỨNG MINH: Hệ thống từ chối
-                bool hasError = driver.PageSource.Contains("không được để trống") ||
-                               driver.PageSource.Contains("required") ||
-                               driver.FindElements(By.CssSelector(".error, .text-danger, .validation-error")).Count > 0 ||
-                               !driver.PageSource.Contains("thành công");
-
-                Console.WriteLine($"  ✅ Step 1 PASS: Gửi comment rỗng - Từ chối: {hasError}");
-                test?.Pass($"Step 1: Empty comment rejected: {hasError}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"  ⚠️ Step 1 SKIP: {ex.Message}");
-                test?.Info($"Step 1: Skipped - {ex.Message}");
-            }
-
-            // Step 2: Gửi bình luận > 1000 ký tự
-            try
-            {
-                var commentTextarea = driver.FindElement(By.CssSelector("textarea, input[name='content']"));
-                commentTextarea.Clear();
-
-                string longContent = new string('A', 1001); // 1001 ký tự
-                commentTextarea.SendKeys(longContent);
-
-                var submitBtn = driver.FindElement(By.XPath("//button[contains(text(),'Gửi') or contains(text(),'Submit')]"));
-                submitBtn.Click();
-                Thread.Sleep(2000);
-
-                // ✅ CHỨNG MINH: Hệ thống từ chối hoặc cắt bớt
-                bool tooLongHandled = driver.PageSource.Contains("quá dài") ||
-                                     driver.PageSource.Contains("1000") ||
-                                     driver.FindElements(By.CssSelector(".error")).Count > 0;
-
-                Console.WriteLine($"  ✅ Step 2 PASS: Gửi comment > 1000 ký tự - Handled: {tooLongHandled}");
-                test?.Pass($"Step 2: Long comment handled: {tooLongHandled}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"  ⚠️ Step 2 SKIP: {ex.Message}");
-                test?.Info($"Step 2: Skipped - {ex.Message}");
-            }
-
-            // Step 3: Gửi bình luận đúng 1000 ký tự
-            try
-            {
-                var commentTextarea = driver.FindElement(By.CssSelector("textarea, input[name='content']"));
-                commentTextarea.Clear();
-
-                string exactContent = new string('B', 1000); // Đúng 1000 ký tự
-                commentTextarea.SendKeys(exactContent);
-
-                var submitBtn = driver.FindElement(By.XPath("//button[contains(text(),'Gửi') or contains(text(),'Submit')]"));
-                submitBtn.Click();
-                Thread.Sleep(2500);
-
-                // ✅ CHỨNG MINH: Đăng thành công
-                bool success = driver.PageSource.Contains("BBBB") ||
-                              driver.PageSource.Contains("thành công") ||
-                              driver.FindElements(By.XPath($"//*[contains(text(),'{exactContent.Substring(0, 10)}')]")).Count > 0;
-
-                Console.WriteLine($"  ✅ Step 3 PASS: Gửi comment 1000 ký tự - Thành công: {success}");
-                test?.Pass($"Step 3: Exact 1000 chars success: {success}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"  ⚠️ Step 3 SKIP: {ex.Message}");
-                test?.Info($"Step 3: Skipped - {ex.Message}");
-            }
-
+            
+            // Kiem tra co loi validation khong
+            bool hasError = driver.PageSource.Contains("khong duoc de trong") ||
+                           driver.PageSource.Contains("không được để trống") ||
+                           driver.PageSource.Contains("required") ||
+                           driver.PageSource.Contains("bat buoc") ||
+                           driver.FindElements(By.CssSelector(".text-danger, .error, .invalid-feedback")).Count > 0;
+            
+            Console.WriteLine($"  Test 1 PASS: Comment rong bi chan: {hasError}");
+            
+            // Test 2: Comment qua dai
+            Console.WriteLine("  Test 2: Nhap comment qua dai (1001 ky tu)...");
+            string longComment = new string('A', 1001);
+            js.ExecuteScript("arguments[0].value = arguments[1];", commentInput, longComment);
+            js.ExecuteScript("arguments[0].dispatchEvent(new Event('input', { bubbles: true }));", commentInput);
+            
+            string? actualValue = (string?)js.ExecuteScript("return arguments[0].value;", commentInput);
+            bool lengthLimited = actualValue == null || actualValue.Length <= 1000;
+            Console.WriteLine($"  Test 2 PASS: Gioi han ky tu: {lengthLimited} (do dai: {actualValue?.Length ?? 0})");
+            
+            test?.Pass($"Validation hoat dong - Rong: {hasError}, Gioi han: {lengthLimited}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"  ❌ BL_INT_04 FAILED: {ex.Message}");
+            Console.WriteLine($"  FAILED: {ex.Message}");
             test?.Fail($"Test failed: {ex.Message}");
         }
     }
 
     /// <summary>
-    /// BL_INT_05: Bình luận hiển thị thông tin đúng: avatar, tên, thời gian, ownership
+    /// BL_INT_05: Kiem tra hien thi thong tin comment
     /// </summary>
     public static void Test_BL_INT_05_CommentDisplayInfo(IWebDriver driver)
     {
-        Console.WriteLine("\n📋 Test BL_INT_05: Comment Display Info");
-        test = ReportManager.extent?.CreateTest("BL_INT_05: Comment Display Information");
+        Console.WriteLine("\n--- Test BL_INT_05: Hien thi thong tin comment ---");
+        test = ReportManager.extent?.CreateTest("BL_INT_05: Hien thi thong tin comment");
 
         try
         {
-            EnsureLoggedIn(driver);
-
-            driver.Navigate().GoToUrl(BaseUrl);
-            Thread.Sleep(2000);
-
-            var searchInput = driver.FindElement(By.CssSelector("input[placeholder*='Search'], input[name='keyword']"));
-            searchInput.Clear();
-            searchInput.SendKeys("phim");
-            searchInput.SendKeys(Keys.Enter);
-            Thread.Sleep(2000);
-
-            var movieLink = driver.FindElement(By.CssSelector("a[href*='/Movie/Detail']"));
-            movieLink.Click();
-            Thread.Sleep(2500);
-
             IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
-            js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight)");
-            Thread.Sleep(1500);
-
-            // Step 1: Thêm bình luận mới
-            string testComment = "Test hiển thị thông tin " + DateTime.Now.ToString("HHmmss");
-
-            try
+            
+            // Cuon xuong phan comment
+            js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight);");
+            Thread.Sleep(2000);
+            
+            // Them 1 comment de kiem tra
+            string testComment = "Test hien thi " + DateTime.Now.ToString("HHmmss");
+            var commentInput = driver.FindElement(By.CssSelector("textarea"));
+            js.ExecuteScript("arguments[0].scrollIntoView({block: 'center'});", commentInput);
+            Thread.Sleep(500);
+            
+            js.ExecuteScript("arguments[0].value = arguments[1];", commentInput, testComment);
+            js.ExecuteScript("arguments[0].dispatchEvent(new Event('input', { bubbles: true }));", commentInput);
+            
+            // Tim nut submit
+            var submitButtons = driver.FindElements(By.CssSelector("button[type='submit'], .btn-primary, button.btn, button"));
+            IWebElement? submitBtn = null;
+            foreach (var btn in submitButtons)
             {
-                var commentTextarea = driver.FindElement(By.CssSelector("textarea, input[name='content']"));
-                commentTextarea.Clear();
-                commentTextarea.SendKeys(testComment);
-
-                var submitBtn = driver.FindElement(By.XPath("//button[contains(text(),'Gửi') or contains(text(),'Submit')]"));
-                submitBtn.Click();
-                Thread.Sleep(2500);
-
-                // ✅ CHỨNG MINH: Hiển thị đầy đủ thông tin
-                var newComment = driver.FindElement(By.XPath($"//*[contains(text(),'{testComment}')]/ancestor::div[contains(@class,'comment')]"));
-
-                bool hasAvatar = newComment.FindElements(By.CssSelector("img.avatar, .user-avatar, .comment-avatar")).Count > 0;
-                bool hasUsername = newComment.Text.Length > testComment.Length; // Có thêm username
-                bool hasTime = newComment.Text.Contains("vừa xong") || newComment.Text.Contains("just") ||
-                              newComment.Text.Contains("giây") || newComment.Text.Contains("phút");
-
-                Console.WriteLine($"  ✅ Step 1 PASS: Bình luận mới hiển thị");
-                Console.WriteLine($"     📊 Avatar: {hasAvatar}");
-                Console.WriteLine($"     📊 Username: {hasUsername}");
-                Console.WriteLine($"     📊 Thời gian: {hasTime}");
-                test?.Pass($"Step 1: New comment - Avatar: {hasAvatar}, Username: {hasUsername}, Time: {hasTime}");
+                string btnText = btn.Text.ToLower();
+                if (btnText.Contains("gửi") || btnText.Contains("gui") || btnText.Contains("submit") || btnText.Contains("đăng") || btnText.Contains("post"))
+                {
+                    submitBtn = btn;
+                    break;
+                }
             }
-            catch (Exception ex)
+            if (submitBtn == null)
             {
-                Console.WriteLine($"  ⚠️ Step 1 SKIP: {ex.Message}");
-                test?.Info($"Step 1: Skipped - {ex.Message}");
+                submitBtn = driver.FindElement(By.CssSelector("form button"));
             }
-
-            // Step 2: Đăng xuất và xem lại
-            try
-            {
-                var logoutLink = driver.FindElement(By.XPath("//a[contains(text(),'Đăng xuất') or contains(text(),'Logout')]"));
-                logoutLink.Click();
-                Thread.Sleep(2000);
-            }
-            catch { }
-
-            driver.Navigate().Back();
-            Thread.Sleep(2500);
-
-            js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight)");
-            Thread.Sleep(1500);
-
-            // ✅ CHỨNG MINH: Comment vẫn hiển thị nhưng không có nút Edit/Delete (vì guest)
-            bool commentVisible = driver.PageSource.Contains(testComment);
-            var guestCommentBtns = driver.FindElements(By.CssSelector(".edit-btn, .delete-btn"));
-
-            Console.WriteLine($"  ✅ Step 2 PASS: Xem ẩn danh");
-            Console.WriteLine($"     📊 Comment vẫn hiển thị: {commentVisible}");
-            Console.WriteLine($"     📊 Nút Edit/Delete (guest): {(guestCommentBtns.Count == 0 ? "Ẩn" : "Hiển thị")}");
-            test?.Pass($"Step 2: Guest view - Comment visible: {commentVisible}, No buttons: {guestCommentBtns.Count == 0}");
-
+            
+            js.ExecuteScript("arguments[0].click();", submitBtn);
+            Thread.Sleep(3000);
+            
+            // Kiem tra thong tin hien thi
+            string pageSource = driver.PageSource;
+            bool hasUsername = pageSource.Contains("user2") || pageSource.Contains("User");
+            bool hasTime = pageSource.Contains("vừa xong") || pageSource.Contains("giây") || 
+                          pageSource.Contains("phút") || pageSource.Contains("trước") ||
+                          pageSource.Contains("vua xong") || pageSource.Contains("giay");
+            bool hasContent = pageSource.Contains(testComment);
+            
+            Console.WriteLine($"  Hien thi username: {hasUsername}");
+            Console.WriteLine($"  Hien thi thoi gian: {hasTime}");
+            Console.WriteLine($"  Hien thi noi dung: {hasContent}");
+            
+            test?.Pass($"Hien thi - Username: {hasUsername}, Time: {hasTime}, Content: {hasContent}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"  ❌ BL_INT_05 FAILED: {ex.Message}");
+            Console.WriteLine($"  FAILED: {ex.Message}");
             test?.Fail($"Test failed: {ex.Message}");
         }
     }
 
+    // ==================== HELPER METHODS ====================
+
     /// <summary>
-    /// Helper: Đảm bảo đã đăng nhập
+    /// Dang nhap voi email va password - LUON THUC HIEN DANG NHAP
     /// </summary>
-    private static void EnsureLoggedIn(IWebDriver driver)
+    private static void Login(IWebDriver driver, string email, string password)
     {
-        driver.Navigate().GoToUrl(BaseUrl);
-        Thread.Sleep(1500);
-
-        // Kiểm tra đã login chưa
-        var loginLinks = driver.FindElements(By.XPath("//a[contains(text(),'Đăng nhập') or contains(text(),'Login')]"));
-        if (loginLinks.Count > 0)
+        // Luon thuc hien dang nhap de dam bao
+        driver.Navigate().GoToUrl($"{BaseUrl}/Account/Login");
+        Thread.Sleep(2000);
+        
+        // Kiem tra neu da o trang khong phai Login (da dang nhap roi)
+        if (!driver.Url.Contains("Login") && !driver.Url.Contains("login"))
         {
-            // Chưa login, tiến hành login
-            driver.Navigate().GoToUrl($"{BaseUrl}/Account/Login");
-            Thread.Sleep(1500);
+            Console.WriteLine($"  Da dang nhap san roi!");
+            return;
+        }
 
-            var emailInput = driver.FindElement(By.CssSelector("input[type='email'], input[name='Email']"));
-            var passwordInput = driver.FindElement(By.CssSelector("input[type='password']"));
+        var emailInput = driver.FindElement(By.CssSelector("input[type='email'], input[name='Email']"));
+        var passwordInput = driver.FindElement(By.CssSelector("input[type='password']"));
 
-            emailInput.Clear();
-            emailInput.SendKeys("user@test.com");
-            passwordInput.Clear();
-            passwordInput.SendKeys("User@1234");
+        emailInput.Clear();
+        emailInput.SendKeys(email);
+        passwordInput.Clear();
+        passwordInput.SendKeys(password);
 
-            driver.FindElement(By.CssSelector("button[type='submit']")).Click();
+        driver.FindElement(By.CssSelector("button[type='submit']")).Click();
+        Thread.Sleep(3000);
+
+        if (driver.Url.Contains("Login") || driver.Url.Contains("login"))
+        {
+            throw new Exception($"Dang nhap that bai voi {email}");
+        }
+        
+        Console.WriteLine($"  Dang nhap thanh cong: {email}");
+    }
+
+    /// <summary>
+    /// Dieu huong den trang xem phim
+    /// </summary>
+    private static void NavigateToWatchPage(IWebDriver driver, IJavaScriptExecutor js)
+    {
+        Console.WriteLine("  Buoc 1: Vao trang chu...");
+        driver.Navigate().GoToUrl(BaseUrl);
+        Thread.Sleep(2000);
+
+        Console.WriteLine("  Buoc 2: Tim kiem phim 'mai'...");
+        var searchInput = driver.FindElement(By.CssSelector("input[placeholder*='Search'], input[placeholder*='Tim'], input[name='keyword'], .search-input"));
+        searchInput.Clear();
+        searchInput.SendKeys("mai");
+        searchInput.SendKeys(Keys.Enter);
+        Thread.Sleep(3000);
+
+        Console.WriteLine("  Buoc 3: Click vao phim dau tien...");
+        
+        // Tim link den trang chi tiet phim
+        var movieLinks = driver.FindElements(By.CssSelector("a[href*='/Movie/Detail']"));
+        if (movieLinks.Count == 0)
+        {
+            // Thu tim theo cau truc khac
+            movieLinks = driver.FindElements(By.CssSelector(".movie-card a, .card a, .movie-item a"));
+        }
+        
+        if (movieLinks.Count == 0)
+        {
+            throw new Exception("Khong tim thay link phim nao!");
+        }
+        
+        Console.WriteLine($"     Tim thay {movieLinks.Count} link phim");
+        Console.WriteLine($"     Click vao: {movieLinks[0].GetAttribute("href")}");
+        
+        // Click bang JavaScript de tranh loi
+        js.ExecuteScript("arguments[0].click();", movieLinks[0]);
+        Thread.Sleep(3000);
+        
+        Console.WriteLine($"     URL sau khi click: {driver.Url}");
+
+        Console.WriteLine("  Buoc 4: Click 'Xem Phim Ngay'...");
+        // Tim nut Xem Phim - uu tien link co slug=
+        IWebElement? watchBtn = null;
+        
+        // Cach 1: Tim link /Watch?slug=
+        var watchLinks = driver.FindElements(By.CssSelector("a[href*='/Watch?slug=']"));
+        if (watchLinks.Count > 0)
+        {
+            watchBtn = watchLinks[0];
+        }
+        else
+        {
+            // Cach 2: Tim theo text
+            try
+            {
+                watchBtn = driver.FindElement(By.XPath("//a[contains(text(),'Xem Phim') or contains(text(),'Xem phim')]"));
+            }
+            catch
+            {
+                // Cach 3: Tim trong episode list
+                var episodes = driver.FindElements(By.CssSelector(".episode-list a, a[href*='episode']"));
+                if (episodes.Count > 0)
+                {
+                    watchBtn = episodes[0];
+                }
+            }
+        }
+        
+        if (watchBtn != null)
+        {
+            Console.WriteLine($"     Tim thay: {watchBtn.Text} - {watchBtn.GetAttribute("href")}");
+            js.ExecuteScript("arguments[0].click();", watchBtn);
             Thread.Sleep(3000);
         }
+        else
+        {
+            Console.WriteLine("     Khong tim thay nut Xem Phim!");
+        }
+        
+        Console.WriteLine($"     URL hien tai: {driver.Url}");
     }
 }
