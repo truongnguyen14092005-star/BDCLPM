@@ -22,7 +22,7 @@ public class UserCommentTest
 
         // DANG NHAP MOT LAN O DAU
         Console.WriteLine("\n>>> BUOC 0: Dang nhap truoc khi test...");
-        Login(driver, "user2@test.com", "User@1234");
+        Login(driver, "user3@test.com", "User@1234");
 
         // Chay cac test case (da dang nhap san)
         Test_BL_INT_01_AddComment(driver);

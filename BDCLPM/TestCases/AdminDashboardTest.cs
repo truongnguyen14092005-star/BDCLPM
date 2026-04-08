@@ -1,3 +1,4 @@
+using System.Linq;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Support.UI;
 using AventStack.ExtentReports;
@@ -10,7 +11,21 @@ public class AdminDashboardTest
 {
     private static ExtentTest? test;
     private static WebDriverWait? wait;
+    public static Dictionary<string, string> LastRunResults { get; private set; } = new Dictionary<string, string>();
     private const string BaseUrl = "https://localhost:5001";
+
+    public static void Initialize(IWebDriver driver)
+    {
+        wait = new WebDriverWait(driver, TimeSpan.FromSeconds(15));
+    }
+
+    private static void EnsureWait(IWebDriver driver)
+    {
+        if (wait == null)
+        {
+            Initialize(driver);
+        }
+    }
 
     public static void RunAllTests(IWebDriver driver)
     {
@@ -19,11 +34,12 @@ public class AdminDashboardTest
         Console.WriteLine(new string('=', 60));
 
         wait = new WebDriverWait(driver, TimeSpan.FromSeconds(15));
+        LastRunResults.Clear();
 
         // Chạy các test case
-        Test_DASH_INT_01_DashboardStatistics(driver);
-        Test_DASH_INT_02_DashboardSync(driver);
-        Test_DASH_INT_03_DashboardAfterDeleteComments(driver);
+        LastRunResults["DASH_INT_01"] = Test_DASH_INT_01_DashboardStatistics(driver) ? "Passed" : "Failed";
+        LastRunResults["DASH_INT_02"] = Test_DASH_INT_02_DashboardSync(driver) ? "Passed" : "Failed";
+        LastRunResults["DASH_INT_03"] = Test_DASH_INT_03_DashboardAfterDeleteComments(driver) ? "Passed" : "Failed";
 
         Console.WriteLine("\n" + new string('=', 60));
         Console.WriteLine("✅ ADMIN DASHBOARD - HOÀN THÀNH");
@@ -33,10 +49,12 @@ public class AdminDashboardTest
     /// <summary>
     /// DASH_INT_01: Dashboard hiển thị đầy đủ card thống kê + Top 10
     /// </summary>
-    public static void Test_DASH_INT_01_DashboardStatistics(IWebDriver driver)
+    public static bool Test_DASH_INT_01_DashboardStatistics(IWebDriver driver)
     {
+        EnsureWait(driver);
         Console.WriteLine("\n📋 Test DASH_INT_01: Dashboard Statistics");
         test = ReportManager.extent?.CreateTest("DASH_INT_01: Dashboard Statistics");
+        bool testPassed = true;
 
         try
         {
@@ -124,16 +142,21 @@ public class AdminDashboardTest
         {
             Console.WriteLine($"  ❌ DASH_INT_01 FAILED: {ex.Message}");
             test?.Fail($"Test failed: {ex.Message}");
+            testPassed = false;
         }
+
+        return testPassed;
     }
 
     /// <summary>
     /// DASH_INT_02: Dashboard đồng bộ - User xem phim + thêm comment → Dashboard cập nhật
     /// </summary>
-    public static void Test_DASH_INT_02_DashboardSync(IWebDriver driver)
+    public static bool Test_DASH_INT_02_DashboardSync(IWebDriver driver)
     {
+        EnsureWait(driver);
         Console.WriteLine("\n📋 Test DASH_INT_02: Dashboard Sync (User activity → Dashboard update)");
         test = ReportManager.extent?.CreateTest("DASH_INT_02: Dashboard Sync");
+        bool testPassed = true;
 
         try
         {
@@ -171,6 +194,24 @@ public class AdminDashboardTest
             driver.Navigate().GoToUrl($"{BaseUrl}/Movie/Detail?slug=mai");
             Thread.Sleep(2000);
 
+            // Bước phụ: Click vào nút Xem Phim Ngay nếu cần
+            try
+            {
+                var watchNowButton = FindWatchNowButton(driver);
+                if (watchNowButton != null)
+                {
+                    watchNowButton.Click();
+                    Thread.Sleep(2000);
+                    Console.WriteLine("  ✅ Step 2a PASS: Clicked 'Xem Phim Ngay' / 'Watch Now'");
+                    test?.Pass("Step 2a: Clicked Watch Now button");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  ⚠️ Step 2a SKIP: Không tìm thấy nút xem phim ngay - {ex.Message}");
+                test?.Info($"Step 2a: Watch Now button skipped - {ex.Message}");
+            }
+
             // ✅ CHỨNG MINH: Video player hiển thị
             bool hasVideoPlayer = driver.FindElements(By.CssSelector("video, iframe[src*='player'], .video-player, .plyr")).Count > 0 ||
                                  driver.PageSource.Contains("Xem Phim") ||
@@ -181,17 +222,17 @@ public class AdminDashboardTest
             // Step 3: Thêm bình luận
             try
             {
-                var commentTextarea = driver.FindElement(By.CssSelector("textarea, input[name='content'], .comment-input"));
+                var commentTextarea = FindCommentInput(driver);
                 commentTextarea.Clear();
                 commentTextarea.SendKeys("Test dashboard sync - " + DateTime.Now.ToString("HHmmss"));
 
-                var submitBtn = driver.FindElement(By.XPath("//button[contains(text(),'Gửi') or contains(text(),'Submit') or contains(text(),'Bình luận')]"));
+                var submitBtn = FindCommentSubmitButton(driver);
                 submitBtn.Click();
                 Thread.Sleep(2000);
 
                 // ✅ CHỨNG MINH: Bình luận đã được thêm
                 bool commentAdded = driver.PageSource.Contains("Test dashboard sync") ||
-                                   driver.FindElements(By.CssSelector(".comment, .comment-item")).Count > 0;
+                                   driver.FindElements(By.CssSelector(".comment, .comment-item, .comment-text, .comment-body")).Count > 0;
                 Console.WriteLine($"  ✅ Step 3 PASS: Thêm bình luận thành công: {commentAdded}");
                 test?.Pass($"Step 3: Comment added: {commentAdded}");
             }
@@ -230,16 +271,21 @@ public class AdminDashboardTest
         {
             Console.WriteLine($"  ❌ DASH_INT_02 FAILED: {ex.Message}");
             test?.Fail($"Test failed: {ex.Message}");
+            testPassed = false;
         }
+
+        return testPassed;
     }
 
     /// <summary>
     /// DASH_INT_03: Dashboard cập nhật sau khi Admin xóa bình luận hàng loạt
     /// </summary>
-    public static void Test_DASH_INT_03_DashboardAfterDeleteComments(IWebDriver driver)
+    public static bool Test_DASH_INT_03_DashboardAfterDeleteComments(IWebDriver driver)
     {
+        EnsureWait(driver);
         Console.WriteLine("\n📋 Test DASH_INT_03: Dashboard sau khi xóa comments");
         test = ReportManager.extent?.CreateTest("DASH_INT_03: Dashboard After Delete Comments");
+        bool testPassed = true;
 
         try
         {
@@ -320,6 +366,105 @@ public class AdminDashboardTest
         {
             Console.WriteLine($"  ❌ DASH_INT_03 FAILED: {ex.Message}");
             test?.Fail($"Test failed: {ex.Message}");
+            testPassed = false;
         }
+
+        return testPassed;
+    }
+
+    private static IWebElement FindCommentInput(IWebDriver driver)
+    {
+        var selectors = new[]
+        {
+            ".comment-form-card textarea",
+            "textarea[placeholder*='Viết bình luận']",
+            "textarea[placeholder*='Bình luận']",
+            "textarea[placeholder*='comment']",
+            "textarea[name*='comment']",
+            "textarea[name*='content']",
+            "textarea[id*='comment']",
+            "textarea[id*='content']",
+            "textarea",
+            ".comment-form-card input",
+            "input[name*='comment']",
+            "input[name*='content']",
+            "input[id*='comment']",
+            "input[id*='content']",
+            "[contenteditable='true']"
+        };
+
+        foreach (var selector in selectors)
+        {
+            var elements = driver.FindElements(By.CssSelector(selector));
+            foreach (var el in elements)
+            {
+                if (el.Displayed && el.Enabled)
+                {
+                    return el;
+                }
+            }
+        }
+
+        var fallback = driver.FindElements(By.XPath("//textarea[contains(@placeholder,'Bình luận') or contains(@placeholder,'comment') or contains(@name,'comment') or contains(@name,'content') or contains(@id,'comment') or contains(@id,'content')] | //input[contains(@placeholder,'Bình luận') or contains(@placeholder,'comment') or contains(@name,'comment') or contains(@name,'content') or contains(@id,'comment') or contains(@id,'content')] | //*[@contenteditable='true']")).FirstOrDefault(el => el.Displayed && el.Enabled);
+        if (fallback != null) return fallback;
+
+        throw new NoSuchElementException("Không tìm được trường nhập comment trên trang movie detail.");
+    }
+
+    private static IWebElement FindCommentSubmitButton(IWebDriver driver)
+    {
+        var selectors = new[]
+        {
+            "button.btn.btn-danger.btn-sm",
+            ".comment-form-card button[type='submit']",
+            "button[type='submit'][class*='btn-danger']",
+            "button[type='submit']",
+            "//button[contains(normalize-space(.),'Gửi bình luận') or contains(text(),'Gửi bình luận') or contains(text(),'Gửi') or contains(text(),'Submit') or contains(text(),'Bình luận') or contains(text(),'Đăng') ]",
+            "//input[@type='submit' and (contains(@value,'Gửi bình luận') or contains(@value,'Gửi') or contains(@value,'Submit') or contains(@value,'Đăng'))]",
+            "//button[contains(@class,'comment') and (contains(@class,'submit') or contains(@class,'send'))]",
+            "//button[contains(@class,'btn') and (contains(text(),'Gửi') or contains(text(),'Submit') or contains(text(),'Đăng'))]"
+        };
+
+        foreach (var selector in selectors)
+        {
+            var elements = selector.StartsWith("//")
+                ? driver.FindElements(By.XPath(selector))
+                : driver.FindElements(By.CssSelector(selector));
+
+            foreach (var el in elements)
+            {
+                if (el.Displayed && el.Enabled)
+                {
+                    return el;
+                }
+            }
+        }
+
+        throw new NoSuchElementException("Không tìm được nút gửi bình luận.");
+    }
+
+    private static IWebElement? FindWatchNowButton(IWebDriver driver)
+    {
+        var xpaths = new[]
+        {
+            "//a[contains(normalize-space(.),'Xem Phim Ngay') or contains(normalize-space(.),'Watch Now') or contains(normalize-space(.),'Xem phim ngay')]",
+            "//button[contains(normalize-space(.),'Xem Phim Ngay') or contains(normalize-space(.),'Watch Now') or contains(normalize-space(.),'Xem phim ngay')]",
+            "//a[contains(@class,'btn') and (contains(text(),'Xem Phim') or contains(text(),'Watch'))]",
+            "//button[contains(@class,'btn') and (contains(text(),'Xem Phim') or contains(text(),'Watch'))]"
+        };
+
+        foreach (var xpath in xpaths)
+        {
+            var elements = driver.FindElements(By.XPath(xpath));
+            foreach (var el in elements)
+            {
+                if (el.Displayed && el.Enabled)
+                {
+                    return el;
+                }
+            }
+        }
+
+        return null;
     }
 }
