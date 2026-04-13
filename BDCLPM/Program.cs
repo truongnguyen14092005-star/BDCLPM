@@ -182,7 +182,7 @@ class Program
                         {
                             Console.WriteLine("\n📊 Running Auto Test Suite (Data-Driven from Excel)...\n");
 
-                            string excelPath = @"C:\Users\truongnguyen\Downloads\IntegrationTestCase_Nhom2_WebMovie.xlsx";
+                            string excelPath = "/Users/doviet/Downloads/IntegrationTestCase_Nhom2_WebMovie.xlsx";
 
                             if (!File.Exists(excelPath))
                             {

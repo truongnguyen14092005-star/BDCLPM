@@ -125,15 +125,11 @@ public class ExcelHelper
 
     public static string GetIntegrationExcelPath()
     {
-        var downloadsPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            "Downloads",
-            "IntegrationTestCase_Nhom2_WebMovie.xlsx"
-        );
+        var excelPath = "/Users/doviet/Downloads/IntegrationTestCase_Nhom2_WebMovie.xlsx";
 
-        if (File.Exists(downloadsPath))
+        if (File.Exists(excelPath))
         {
-            return downloadsPath;
+            return excelPath;
         }
 
         var fallbackPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestData", "IntegrationTestCase_Nhom2_WebMovie.xlsx");

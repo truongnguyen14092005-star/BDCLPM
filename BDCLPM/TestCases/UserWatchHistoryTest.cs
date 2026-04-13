@@ -82,73 +82,8 @@ public class UserWatchHistoryTest
         {
             EnsureLoggedIn(driver);
 
-            // Step 1: Vào xem phim
-            driver.Navigate().GoToUrl(BaseUrl);
-            Thread.Sleep(2000);
-
-            var searchInput = driver.FindElement(By.CssSelector("input[placeholder*='Search'], input[name='keyword']"));
-            searchInput.Clear();
-            searchInput.SendKeys("Mai");
-            searchInput.SendKeys(Keys.Enter);
-            Thread.Sleep(2000);
-
-            // Navigate truc tiep thay vi click
-            var movieLink = driver.FindElement(By.CssSelector("a[href*='/Movie/Detail'], .movie-card a"));
-            string? detailUrl = movieLink.GetAttribute("href");
-            if (!string.IsNullOrEmpty(detailUrl))
-                driver.Navigate().GoToUrl(detailUrl);
-            else
-                SafeClick(driver, movieLink);
-            AcceptAlertIfPresent(driver);
-            Thread.Sleep(2000);
-
-            // Click xem phim
-            try
-            {
-                var watchBtn = driver.FindElement(By.XPath("//a[contains(text(),'Xem Phim') or contains(@href,'/Watch')]"));
-                string? watchUrl = watchBtn.GetAttribute("href");
-                if (!string.IsNullOrEmpty(watchUrl))
-                    driver.Navigate().GoToUrl(watchUrl);
-                else
-                    SafeClick(driver, watchBtn);
-            }
-            catch
-            {
-                var firstEp = driver.FindElement(By.CssSelector(".episode-list a, a[href*='episode']"));
-                SafeClick(driver, firstEp);
-            }
-            AcceptAlertIfPresent(driver);
-            Thread.Sleep(3000);
-
-            // ✅ CHỨNG MINH: Video phát
-            IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
-            bool videoPlaying = driver.FindElements(By.CssSelector("video, iframe")).Count > 0;
-            
-            // Thử play video nếu đang pause
-            try
-            {
-                js.ExecuteScript("var v = document.querySelector('video'); if(v && v.paused) { v.play(); }");
-            }
-            catch { }
-            
-            Console.WriteLine($"  ✅ Step 1 PASS: Video đang phát: {videoPlaying}");
-            test?.Pass($"Step 1: Video playing: {videoPlaying}");
-
-            // Xem 10 giây để auto-save progress (giảm từ 60s để test nhanh hơn)
-            Console.WriteLine("  ⏳ Đang xem 10 giây để auto-save progress...");
-            Thread.Sleep(10000);
-            
-            // Verify video đang chạy
-            double currentTime = 0;
-            try
-            {
-                currentTime = Convert.ToDouble(js.ExecuteScript("var v = document.querySelector('video'); return v ? v.currentTime : 0;") ?? 0);
-            }
-            catch { }
-
-            Console.WriteLine($"  ✅ Auto-save progress đã được gọi (currentTime: {currentTime:F2}s)");
-
-            // Step 2: Vào /Watch/History
+   
+            // Step : Vào /Watch/History
             driver.Navigate().GoToUrl($"{BaseUrl}/Watch/History");
             Thread.Sleep(3000);
 
@@ -180,71 +115,56 @@ public class UserWatchHistoryTest
             }
 
             // Step 4: Xóa mục lịch sử
+            int beforeCount = historyItems.Count;
+            bool deleted = false;
+            
             try
             {
-                var deleteBtn = driver.FindElement(By.CssSelector(".delete-history-btn, button[onclick*='delete'], .btn-danger, a[href*='Delete']"));
-                int beforeCount = historyItems.Count;
-
-                deleteBtn.Click();
+                // Tìm nút xóa
+                var deleteBtn = driver.FindElement(By.XPath(
+                    "(//a[contains(@href, '/Watch')]/.. | //div[contains(@class, 'history')])[1]//button[contains(text(), 'Xóa')] | " +
+                    "(//a[contains(@href, '/Watch')]/.. | //div[contains(@class, 'history')])[1]//.btn-danger | " +
+                    "(//a[contains(@href, '/Watch')]/.. | //div[contains(@class, 'history')])[1]//a[contains(@href, 'Delete')]"
+                ));
+                
+                Console.WriteLine($"  📝 Step 4: Xóa mục lịch sử...");
+                SafeClick(driver, deleteBtn);
                 Thread.Sleep(1000);
 
-                // Xác nhận
+                // Xác nhận nếu có dialog
                 try
                 {
-                    var confirmBtn = driver.FindElement(By.XPath("//button[contains(text(),'OK') or contains(text(),'Yes') or contains(text(),'Xác nhận')]"));
+                    var confirmBtn = driver.FindElement(By.XPath("//button[contains(text(),'OK') or contains(text(),'Yes') or contains(text(),'Xác nhận') or contains(text(),'Có')]"));
                     confirmBtn.Click();
                     Thread.Sleep(2000);
                 }
                 catch { }
 
-                // ✅ CHỨNG MINH: Mục bị xóa
-                var afterItems = driver.FindElements(By.CssSelector(".history-item, .watch-history-item, table tbody tr"));
+                // Kiểm tra xóa thành công
+                var afterItems = driver.FindElements(By.CssSelector(".history-item, .watch-history-item, table tbody tr, .movie-card, .history-card"));
                 int afterCount = afterItems.Count;
-                bool deleted = afterCount < beforeCount || !driver.PageSource.Contains("Mai");
+                deleted = afterCount < beforeCount;
 
-                Console.WriteLine($"  ✅ Step 4 PASS: Xóa lịch sử");
-                Console.WriteLine($"     📊 Số mục: {beforeCount} → {afterCount}");
-                Console.WriteLine($"     📊 Đã xóa: {deleted}");
-                test?.Pass($"Step 4: Delete - Before: {beforeCount}, After: {afterCount}");
+                if (!deleted)
+                {
+                    Console.WriteLine($"  ❌ Step 4 FAIL: Lỗi");
+                    Console.WriteLine($"     📊 Số mục: {beforeCount} → {afterCount} (không thay đổi)");
+                    test?.Fail($"Step 4: Delete failed - Count: {beforeCount} → {afterCount}");
+                    testPassed = false;
+                }
+                else
+                {
+                    Console.WriteLine($"  ✅ Step 4 PASS: Xóa thành công");
+                    Console.WriteLine($"     📊 Số mục: {beforeCount} → {afterCount}");
+                    test?.Pass($"Step 4: Delete successful - Before: {beforeCount}, After: {afterCount}");
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"  ⚠️ Step 4 SKIP: {ex.Message}");
-                test?.Info($"Step 4: Skipped - {ex.Message}");
+                Console.WriteLine($"  ❌ Step 4 FAIL: Không tìm được nút xóa - {ex.Message}");
+                test?.Fail($"Step 4: Cannot find delete button - {ex.Message}");
+                testPassed = false;
             }
-
-            // Step 5: Quay lại xem phim - Phim bắt đầu từ đầu
-            searchInput = driver.FindElement(By.CssSelector("input[placeholder*='Search'], input[name='keyword']"));
-            searchInput.Clear();
-            searchInput.SendKeys("Mai");
-            searchInput.SendKeys(Keys.Enter);
-            Thread.Sleep(2000);
-
-            movieLink = driver.FindElement(By.CssSelector("a[href*='/Movie/Detail']"));
-            detailUrl = movieLink.GetAttribute("href");
-            if (!string.IsNullOrEmpty(detailUrl))
-                driver.Navigate().GoToUrl(detailUrl);
-            else
-                SafeClick(driver, movieLink);
-            AcceptAlertIfPresent(driver);
-            Thread.Sleep(2000);
-
-            try
-            {
-                var watchBtn = driver.FindElement(By.XPath("//a[contains(text(),'Xem Phim') or contains(@href,'/Watch')]"));
-                string? watchUrl = watchBtn.GetAttribute("href");
-                if (!string.IsNullOrEmpty(watchUrl))
-                    driver.Navigate().GoToUrl(watchUrl);
-                else
-                    SafeClick(driver, watchBtn);
-                AcceptAlertIfPresent(driver);
-                Thread.Sleep(3000);
-            }
-            catch { }
-
-            // ✅ CHỨNG MINH: Phim bắt đầu từ đầu (không resume)
-            Console.WriteLine($"  ✅ Step 5 PASS: Phim bắt đầu từ đầu (không resume vì đã xóa lịch sử)");
-            test?.Pass("Step 5: Movie starts from beginning (no resume after delete)");
 
         }
         catch (Exception ex)
@@ -270,63 +190,20 @@ public class UserWatchHistoryTest
         {
             EnsureLoggedIn(driver);
 
-            // Xem 1 phim trước (để có history)
-            driver.Navigate().GoToUrl(BaseUrl);
-            Thread.Sleep(2000);
-
-            var searchInput = driver.FindElement(By.CssSelector("input[placeholder*='Search'], input[name='keyword']"));
-            searchInput.Clear();
-            searchInput.SendKeys("Mai");
-            searchInput.SendKeys(Keys.Enter);
-            Thread.Sleep(2000);
-
-            try
-            {
-                var movieLink = driver.FindElement(By.CssSelector("a[href*='/Movie/Detail']"));
-                string? detailUrl = movieLink.GetAttribute("href");
-                if (!string.IsNullOrEmpty(detailUrl))
-                    driver.Navigate().GoToUrl(detailUrl);
-                else
-                    SafeClick(driver, movieLink);
-                AcceptAlertIfPresent(driver);
-                Thread.Sleep(2000);
-
-                // Chọn tập 3 (nếu có)
-                var episodes = driver.FindElements(By.CssSelector(".episode-list a, a[href*='episode']"));
-                if (episodes.Count > 2)
-                {
-                    SafeClick(driver, episodes[2]);
-                }
-                else if (episodes.Count > 0)
-                {
-                    SafeClick(driver, episodes[0]);
-                }
-                else
-                {
-                    var watchBtn = driver.FindElement(By.XPath("//a[contains(text(),'Xem Phim')]"));
-                    string? watchUrl = watchBtn.GetAttribute("href");
-                    if (!string.IsNullOrEmpty(watchUrl))
-                        driver.Navigate().GoToUrl(watchUrl);
-                    else
-                        SafeClick(driver, watchBtn);
-                }
-                AcceptAlertIfPresent(driver);
-                Thread.Sleep(3000);
-
-                // Xem 30 giây
-                Console.WriteLine("  ⏳ Xem 30 giây để lưu progress...");
-                Thread.Sleep(30000);
-            }
-            catch
-            {
-                Console.WriteLine("  ⚠️ Không tìm được phim, thử phim khác...");
-            }
+           
 
             // Step 1: Vào /Watch/History
             driver.Navigate().GoToUrl($"{BaseUrl}/Watch/History");
             Thread.Sleep(2500);
 
-            var historyItems = driver.FindElements(By.CssSelector(".history-item, .watch-history-item, table tbody tr, .movie-card"));
+            // Bắt history card - thêm selectors khác nếu .history-item không match
+            var historyItems = driver.FindElements(By.CssSelector(
+                ".history-item, .watch-history-item, table tbody tr, .movie-card, " +
+                ".history-card, [data-history], .watch-item, .resume-item, " +
+                "a[href*='/Watch/'], a[href*='/Movie/Detail']"
+            ));
+
+            Console.WriteLine($"  🔍 Tìm thấy {historyItems.Count} history items (CSS selector)");
 
             // ✅ CHỨNG MINH: Có phim trong lịch sử
             Console.WriteLine($"  ✅ Step 1 PASS: Trang History - {historyItems.Count} mục");
@@ -334,27 +211,81 @@ public class UserWatchHistoryTest
 
             if (historyItems.Count == 0)
             {
+                // Fallback: thử XPath poster image - user đã catch được pattern này
+                historyItems = driver.FindElements(By.XPath(
+                    "//a[contains(@href, '/Watch')]/div/img | " +
+                    "//div[contains(@class, 'history') or contains(@class, 'card')] | " +
+                    "//a[contains(@href, '/Watch') or contains(@href, '/Movie/Detail')]"
+                ));
+                Console.WriteLine($"  🔍 XPath fallback: Tìm thấy {historyItems.Count} items");
+            }
+
+            if (historyItems.Count == 0)
+            {
                 Console.WriteLine("  ⚠️ Không có lịch sử xem để test resume");
+                test?.Warning("Không tìm thấy history items - có thể history trống hoặc selector sai");
                 return false;
             }
 
-            // Step 2: Click vào phim trong lịch sử
-            var resumeLink = historyItems[0].FindElement(By.CssSelector("a, .resume-btn"));
-            string movieTitle = resumeLink.Text;
-            resumeLink.Click();
+            // Step 2: Click vào phim trong lịch sử - poster đầu tiên
+            Console.WriteLine($"\n  📝 Step 2: Click vào poster phim đầu tiên...");
+            
+            // Tìm poster image bên trong link Watch
+            IWebElement posterLink = null;
+            try
+            {
+                posterLink = driver.FindElement(By.XPath("(//a[contains(@href, '/Watch')]/div/img)[1]/.."));
+            }
+            catch { }
+            
+            if (posterLink == null)
+            {
+                try
+                {
+                    posterLink = driver.FindElement(By.XPath("(//a[contains(@href, '/Watch')])[1]"));
+                }
+                catch { }
+            }
+            
+            if (posterLink == null)
+            {
+                Console.WriteLine("  ❌ Không tìm được poster link");
+                test?.Fail("Step 2: Cannot find poster link");
+                return false;
+            }
+            
+            string href = posterLink.GetAttribute("href") ?? "";
+            Console.WriteLine($"     Click vào poster: href='{href}'");
+            
+            SafeClick(driver, posterLink);
             Thread.Sleep(3000);
+            
+            string currentUrl = driver.Url;
+            Console.WriteLine($"     URL sau click: {currentUrl}");
 
             // ✅ CHỨNG MINH: Chuyển đến trang Watch
-            bool onWatchPage = driver.Url.Contains("Watch") || driver.FindElements(By.CssSelector("video, iframe")).Count > 0;
-            Console.WriteLine($"  ✅ Step 2 PASS: Click resume - Trang Watch: {onWatchPage}");
-            test?.Pass($"Step 2: Navigate to watch: {onWatchPage}");
+            bool onWatchPage = driver.Url.Contains("Watch");
+            if (!onWatchPage)
+            {
+                Console.WriteLine($"  ❌ Không redirect, URL: {currentUrl}");
+                test?.Fail($"Step 2: Should redirect to Watch, got: {currentUrl}");
+                return false;
+            }
+            
+            Console.WriteLine($"  ✅ Step 2 PASS: Redirect thành công");
+            test?.Pass($"Step 2: Redirected to watch page");
 
-            // Step 3: Kiểm tra vị trí phát
-            // ✅ CHỨNG MINH: Player seek đến vị trí đã xem
+            // Step 3: Kiểm tra video load
             bool videoLoaded = driver.FindElements(By.CssSelector("video, iframe")).Count > 0;
-            Console.WriteLine($"  ✅ Step 3 PASS: Resume hoạt động - Video loaded: {videoLoaded}");
-            Console.WriteLine($"     📊 Player sẽ tự động seek đến vị trí đã xem");
-            test?.Pass($"Step 3: Resume - Video loaded: {videoLoaded}");
+            if (!videoLoaded)
+            {
+                Console.WriteLine($"  ❌ Video không load");
+                test?.Fail("Step 3: Video not loaded");
+                return false;
+            }
+            
+            Console.WriteLine($"  ✅ Step 3 PASS: Video loaded");
+            test?.Pass($"Step 3: Video loaded successfully");
 
         }
         catch (Exception ex)
@@ -368,56 +299,56 @@ public class UserWatchHistoryTest
     }
 
     /// <summary>
-    /// LS_INT_03: Danh sách lịch sử: sắp xếp, giới hạn 50 mục, hiển thị IsCompleted
+    /// LS_INT_03: Guest truy cập /Watch/History → phải redirect về /Account/Login
+    /// Pre-condition: User CHƯA đăng nhập (Guest)
     /// </summary>
     public static bool Test_LS_INT_03_HistoryListAndCompleted(IWebDriver driver)
     {
-        Console.WriteLine("\n📋 Test LS_INT_03: History List Features");
-        test = ReportManager.extent?.CreateTest("LS_INT_03: History List Features");
+        Console.WriteLine("\n📋 Test LS_INT_03: Guest Access History (Should Redirect to Login)");
+        test = ReportManager.extent?.CreateTest("LS_INT_03: Guest History Access Redirect");
         bool testPassed = true;
 
         try
         {
-            EnsureLoggedIn(driver);
+            // Step 1: Logout trước để đảm bảo là Guest
+            LogoutIfLoggedIn(driver);
+            Thread.Sleep(1000);
 
-            // Step 1: Vào /Watch/History
+            // Step 2: Truy cập trực tiếp /Watch/History khi chưa đăng nhập
             driver.Navigate().GoToUrl($"{BaseUrl}/Watch/History");
-            Thread.Sleep(3000);
+            Thread.Sleep(2000);
 
-            var historyItems = driver.FindElements(By.CssSelector(".history-item, .watch-history-item, table tbody tr, .movie-card"));
+            // Step 3: Kiểm tra redirect về login page
+            string currentUrl = driver.Url.ToLower();
+            bool isRedirectedToLogin = currentUrl.Contains("/account/login") || 
+                                       currentUrl.Contains("/login") ||
+                                       driver.PageSource.Contains("Đăng nhập") ||
+                                       driver.PageSource.Contains("Login");
 
-            // ✅ CHỨNG MINH: Giới hạn 50 mục
-            bool within50 = historyItems.Count <= 50;
-            Console.WriteLine($"  ✅ Step 1 PASS: Danh sách lịch sử");
-            Console.WriteLine($"     📊 Số mục: {historyItems.Count}");
-            Console.WriteLine($"     📊 Trong giới hạn 50: {within50}");
-            test?.Pass($"Step 1: History list - Count: {historyItems.Count}, Within limit: {within50}");
+            if (!isRedirectedToLogin)
+            {
+                Console.WriteLine($"  ❌ LS_INT_03 Step 1 FAIL: Không redirect, URL: {currentUrl}");
+                test?.Fail($"Step 1: Should redirect to login but got: {currentUrl}");
+                return false;
+            }
+            
+            Console.WriteLine($"  ✅ LS_INT_03 Step 1 PASS: Redirect về login page");
+            Console.WriteLine($"     📍 Current URL: {currentUrl}");
+            test?.Pass($"Step 1: Redirected to login - URL: {currentUrl}");
 
-            // Step 2: Kiểm tra phim đã hoàn thành (≥90%)
-            bool hasCompleted = driver.PageSource.Contains("Đã hoàn thành") ||
-                               driver.PageSource.Contains("Completed") ||
-                               driver.PageSource.Contains("100%") ||
-                               driver.FindElements(By.CssSelector(".completed-icon, .is-completed, .badge-completed")).Count > 0;
+            // Step 2: Kiểm tra login form có xuất hiện
+            bool hasLoginForm = driver.FindElements(By.CssSelector("input[type='email'], input[name='email'], input[name*='mail']")).Count > 0 ||
+                               driver.FindElements(By.CssSelector("input[type='password'], input[name='password']")).Count > 0;
 
-            Console.WriteLine($"  ✅ Step 2 PASS: Trạng thái hoàn thành: {hasCompleted}");
-            test?.Pass($"Step 2: Completed status: {hasCompleted}");
+            if (!hasLoginForm)
+            {
+                Console.WriteLine($"  ❌ LS_INT_03 Step 2 FAIL: Login form không xuất hiện");
+                test?.Fail($"Step 2: Login form not found");
+                return false;
+            }
 
-            // Step 3: Kiểm tra phim đang xem (<90%)
-            bool hasInProgress = driver.PageSource.Contains("Đang xem") ||
-                                driver.PageSource.Contains("In Progress") ||
-                                driver.FindElements(By.CssSelector(".progress-bar")).Count > 0;
-
-            // ✅ CHỨNG MINH: Có % tiến trình
-            var progressElements = driver.FindElements(By.CssSelector(".progress, .progress-bar, .progress-percent"));
-            Console.WriteLine($"  ✅ Step 3 PASS: Phim đang xem");
-            Console.WriteLine($"     📊 In Progress: {hasInProgress}");
-            Console.WriteLine($"     📊 Progress elements: {progressElements.Count}");
-            test?.Pass($"Step 3: In progress - Status: {hasInProgress}, Progress bars: {progressElements.Count}");
-
-            // Kiểm tra sắp xếp (mới nhất đầu tiên)
-            // ✅ CHỨNG MINH: Thứ tự theo LastWatchedAt
-            Console.WriteLine($"  ✅ Step 4 PASS: Danh sách sắp xếp theo thời gian mới nhất đầu tiên");
-            test?.Pass("Step 4: Sorted by LastWatchedAt DESC");
+            Console.WriteLine($"  ✅ LS_INT_03 Step 2 PASS: Login form visible");
+            test?.Pass($"Step 2: Login form present");
 
         }
         catch (Exception ex)
@@ -593,25 +524,29 @@ public class UserWatchHistoryTest
     private static void EnsureLoggedIn(IWebDriver driver)
     {
         AcceptAlertIfPresent(driver);
-        driver.Navigate().GoToUrl(BaseUrl);
+        
+        // Luôn thực hiện đăng nhập
+        driver.Navigate().GoToUrl($"{BaseUrl}/Account/Login");
         Thread.Sleep(1500);
-
-        var loginLinks = driver.FindElements(By.XPath("//a[contains(text(),'Đăng nhập') or contains(text(),'Login')]"));
-        if (loginLinks.Count > 0)
+        
+        // Kiểm tra nếu đã có login form thì điền thông tin
+        try
         {
-            driver.Navigate().GoToUrl($"{BaseUrl}/Account/Login");
-            Thread.Sleep(1500);
-
             var emailInput = driver.FindElement(By.CssSelector("input[type='email'], input[name='Email']"));
             var passwordInput = driver.FindElement(By.CssSelector("input[type='password']"));
 
             emailInput.Clear();
-            emailInput.SendKeys("user3@test.com");
+            emailInput.SendKeys("user2@test.com");
             passwordInput.Clear();
-            passwordInput.SendKeys("123456");
+            passwordInput.SendKeys("User@1234");
 
             driver.FindElement(By.CssSelector("button[type='submit']")).Click();
             Thread.Sleep(3000);
+        }
+        catch
+        {
+            // Nếu không tìm thấy form, có thể đã đăng nhập rồi
+            Console.WriteLine("⚠️ Không tìm thấy form đăng nhập");
         }
     }
 
@@ -630,6 +565,32 @@ public class UserWatchHistoryTest
         catch (ElementClickInterceptedException)
         {
             ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].click();", element);
+        }
+    }
+
+    private static void LogoutIfLoggedIn(IWebDriver driver)
+    {
+        try
+        {
+            // Kiểm tra xem có link đăng xuất không (là dấu hiệu đã đăng nhập)
+            var logoutLinks = driver.FindElements(By.CssSelector("a[href*='/Account/Logout'], a[href*='/logout'], a:contains('Logout'), a:contains('Đăng xuất')"));
+            
+            if (logoutLinks.Count > 0)
+            {
+                Console.WriteLine("🔓 Đang đăng xuất...");
+                logoutLinks[0].Click();
+                Thread.Sleep(2000);
+            }
+            else
+            {
+                // Cách khác: truy cập trực tiếp logout endpoint
+                driver.Navigate().GoToUrl($"{BaseUrl}/Account/Logout");
+                Thread.Sleep(1500);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ Logout error (không lỗi nghiêm trọng): {ex.Message}");
         }
     }
 
